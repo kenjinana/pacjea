@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pac-Man Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        canvas {
+            border: 1px solid white;
+        }
+
+        #score {
+            margin-top: 10px;
+            font-size: 24px;
+        }
+
+        #gameOver {
+            margin-top: 20px;
+            font-size: 20px;
+            color: red;
+            display: none; /* Hide by default */
+        }
+
+        #restartButton {
+            display: none; /* Hide by default */
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: yellow;
+            color: black;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <div id="score">Score: 0</div>
+    <div id="gameOver">Game Over! Refresh to play again.</div>
+    <button id="restartButton">Restart Game</button>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const cellSize = 40; // Size of each cell in the maze
+        const rows = 10; // Number of rows in the maze
+        const cols = 10; // Number of columns in the maze
+        let score = 0;
+        let gameOver = false;
+
+        // Initialize maze layout (1: wall, 0: path)
+        const maze = [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+            [1, 0, 1, 0, 1, 1, 1, 0, 0, 1],
+            [1, 0, 1, 0, 0, 0, 0, 1, 0, 1],
+            [1, 0, 0, 0, 1, 1, 0, 1, 0, 1],
+            [1, 1, 1, 0, 1, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 1, 1, 1, 1, 0, 1],
+            [1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 1, 1, 1, 1, 1, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ];
+
+        // Initialize pellets array
+        const pellets = [];
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                if (maze[row][col] === 0) {
+                    pellets.push({ x: col * cellSize, y: row * cellSize });
+                }
+            }
+        }
+
+        // Pac-Man's initial position
+        let pacman = {
+            x: cellSize,
+            y: cellSize,
+            speed: cellSize,
+        };
+
+        // Ghost's initial position (make sure it's not at the same position as Pac-Man)
+        let ghost = {
+            x: 3 * cellSize,
+            y: 2 * cellSize,
+            speed: cellSize,
+        };
+
+        // Draw maze
+        function drawMaze() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'blue';
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    if (maze[row][col] === 1) {
+                        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
+        }
+
+        // Draw Pac-Man
+        function drawPacman() {
+            ctx.fillStyle = 'yellow';
+            ctx.beginPath();
+            ctx.arc(pacman.x + cellSize / 2, pacman.y + cellSize / 2, cellSize / 2 - 5, 0.2 * Math.PI, 1.8 * Math.PI);
+            ctx.lineTo(pacman.x + cellSize / 2, pacman.y + cellSize / 2);
+            ctx.fill();
+        }
+
+        // Draw Ghost
+        function drawGhost() {
+            ctx.fillStyle = 'red';
+            ctx.fillRect(ghost.x, ghost.y, cellSize, cellSize);
+        }
+
+        // Draw Pellets
+        function drawPellets() {
+            ctx.fillStyle = 'white';
+            for (const pellet of pellets) {
+                ctx.beginPath();
+                ctx.arc(pellet.x + cellSize / 2, pellet.y + cellSize / 2, 5, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+
+        // Move Pac-Man
+        function movePacman(dx, dy) {
+            const newX = pacman.x + dx;
+            const newY = pacman.y + dy;
+
+            // Check collision with walls
+            if (maze[newY / cellSize][newX / cellSize] === 0) {
+                pacman.x = newX;
+                pacman.y = newY;
+
+                // Check if Pac-Man eats a pellet
+                for (let i = pellets.length - 1; i >= 0; i--) {
+                    if (pellets[i].x === pacman.x && pellets[i].y === pacman.y) {
+                        pellets.splice(i, 1); // Remove the pellet
+                        score++;
+                        document.getElementById('score').innerText = 'Score: ' + score;
+                    }
+                }
+            }
+        }
+
+        // Move Ghost (basic AI)
+        function moveGhost() {
+            const dx = Math.sign(pacman.x - ghost.x) * ghost.speed;
+            const dy = Math.sign(pacman.y - ghost.y) * ghost.speed;
+
+            if (maze[(ghost.y + dy) / cellSize][(ghost.x) / cellSize] === 0) {
+                ghost.y += dy; // Move ghost vertically
+            }
+            if (maze[(ghost.y) / cellSize][(ghost.x + dx) / cellSize] === 0) {
+                ghost.x += dx; // Move ghost horizontally
+            }
+        }
+
+        // Check for collisions
+        function checkCollisions() {
+            if (pacman.x === ghost.x && pacman.y === ghost.y) {
+                gameOver = true;
+                document.getElementById('gameOver').style.display = 'block';
+                document.getElementById('restartButton').style.display = 'block'; // Show the restart button
+            }
+        }
+
+        // Game loop
+        function gameLoop() {
+            if (gameOver) return;
+
+            drawMaze();
+            drawPellets();
+            drawPacman();
+            drawGhost();
+            moveGhost();
+            checkCollisions();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Keydown event listener
+        document.addEventListener('keydown', function(event) {
+            if (!gameOver) {
+                switch (event.key) {
+                    case 'ArrowUp':
+                        event.preventDefault();
+                        movePacman(0, -pacman.speed);
+                        break;
+                    case 'ArrowDown':
+                        event.preventDefault();
+                        movePacman(0, pacman.speed);
+                        break;
+                    case 'ArrowLeft':
+                        event.preventDefault();
+                        movePacman(-pacman.speed, 0);
+                        break;
+                    case 'ArrowRight':
+                        event.preventDefault();
+                        movePacman(pacman.speed, 0);
+                        break;
+                }
+            }
+        });
+
+        // Restart Game
+        document.getElementById('restartButton').addEventListener('click', function() {
+            score = 0;
+            pacman.x = cellSize;
+            pacman.y = cellSize;
+            ghost.x = 3 * cellSize;
+            ghost.y = 2 * cellSize;
+            gameOver = false;
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('restartButton').style.display = 'none'; // Hide the restart button
+            document.getElementById('score').innerText = 'Score: ' + score;
+            gameLoop(); // Restart the game loop
+        });
+
+        // Start the game
+        gameLoop();
+    </script>
+</body>
+</html>
